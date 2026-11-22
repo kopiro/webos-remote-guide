@@ -10,6 +10,8 @@ See what each remapped button on your LG Magic Remote does. Remote Guide puts yo
 
 When Magic Mapper loads its configuration, a Python helper writes button names, action descriptions and press details into the installed web app. Remote Guide reads that file when opened, when it returns to the foreground and every 15 seconds while visible. Browsing the guide never executes a shortcut. Buttons outside the photographed layout still appear as text entries.
 
+The physical button names and positions belong to the MR24 layout. Action titles are generated from each configured function and its arguments. The exporter supplies wording for known actions and apps, while optional local labels supply names for HDMI devices, scripts and webhooks.
+
 ## Build and install
 
 You need the webOS CLI on your computer and a TV with Python 3, shell access and an existing Magic Mapper installation. The installer supports the file-based mapper that loads its JSON configuration into `button_map` in `get_button_map()`. It checks for that loader before applying its hook.

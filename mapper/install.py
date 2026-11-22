@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import stat
 import tempfile
@@ -43,10 +44,10 @@ def main():
     with (ROOT / "magic_mapper_config.json").open() as config:
         publish(json.load(config), labels_dir=ROOT)
     if ANCHOR + HOOK not in current:
-        old_hook = HOOK.replace("from remote_guide import", "from titano_remote_guide import")
-        if ANCHOR + old_hook in current:
-            modified = current.replace(ANCHOR + old_hook, ANCHOR + HOOK)
-        else:
+        # Recognize the previous exporter by its complete hook, independent of its module prefix.
+        hook_pattern = re.escape(ANCHOR + HOOK).replace("remote_guide", r"[A-Za-z_]\w*_remote_guide", 1)
+        modified, replaced = re.subn(hook_pattern, lambda _: ANCHOR + HOOK, current, count=1)
+        if not replaced:
             modified = current.replace(ANCHOR, ANCHOR + HOOK)
         compile(modified, str(MAPPER), "exec")
         backup = ROOT / ("magic_mapper.py.before-remote-guide-" + hashlib.sha256(source).hexdigest()[:12])
