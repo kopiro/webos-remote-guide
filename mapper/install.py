@@ -1,4 +1,4 @@
-"""Install the display-only export hook after installing the IPK."""
+"""Install the companion hooks after installing the IPK."""
 import hashlib
 import json
 import os
@@ -14,11 +14,20 @@ ROOT = Path("/home/root")
 MAPPER = ROOT / "magic_mapper.py"
 PACKAGE = Path(__file__).parent
 ANCHOR = "        button_map = json.load(config_file)\n"
-HOOK = """    try:
+DISPLAY_HOOK = """    try:
         from remote_guide import publish
         publish(button_map)
     except Exception as error:
         print("Remote Guide export unavailable: %s" % type(error).__name__)
+"""
+
+HOOK = """    try:
+        import sys
+        from guide_control import attach
+        from remote_guide import publish
+        publish(button_map, control=attach(button_map, sys.modules[__name__]))
+    except Exception as error:
+        print("Remote Guide unavailable: %s" % type(error).__name__)
 """
 
 
@@ -37,7 +46,8 @@ def main():
         raise SystemExit("Unrecognized Magic Mapper config loader")
     if not APP.is_dir():
         raise SystemExit("Install the Remote Guide IPK first")
-    install_file(ROOT / "remote_guide.py", (PACKAGE / "remote_guide.py").read_bytes(), 0o600)
+    for name in ("guide_control.py", "remote_guide.py"):
+        install_file(ROOT / name, (PACKAGE / name).read_bytes(), 0o600)
     for name in ("webhook-labels.json", "guide-labels.json"):
         if (PACKAGE / name).is_file():
             install_file(ROOT / name, (PACKAGE / name).read_bytes(), 0o600)
@@ -45,7 +55,7 @@ def main():
         publish(json.load(config), labels_dir=ROOT)
     if ANCHOR + HOOK not in current:
         # Recognize the previous exporter by its complete hook, independent of its module prefix.
-        hook_pattern = re.escape(ANCHOR + HOOK).replace("remote_guide", r"[A-Za-z_]\w*_remote_guide", 1)
+        hook_pattern = re.escape(ANCHOR + DISPLAY_HOOK).replace("remote_guide", r"(?:[A-Za-z_]\w*_)?remote_guide", 1)
         modified, replaced = re.subn(hook_pattern, lambda _: ANCHOR + HOOK, current, count=1)
         if not replaced:
             modified = current.replace(ANCHOR, ANCHOR + HOOK)
@@ -56,7 +66,7 @@ def main():
         if backup.read_bytes() != source or MAPPER.read_bytes() != source:
             raise SystemExit("Magic Mapper changed during installation")
         install_file(MAPPER, modified.encode(), stat.S_IMODE(MAPPER.stat().st_mode))
-    print("Remote Guide projection installed")
+    print("Remote Guide installed. Restart Magic Mapper to enable shortcut activation.")
 
 
 if __name__ == "__main__":

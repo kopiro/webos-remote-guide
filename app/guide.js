@@ -20,8 +20,17 @@ const keys = document.querySelector("#keys");
 const lines = document.querySelector("#lines");
 const statusBox = document.querySelector("#status");
 const detail = document.querySelector("#detail");
-const nav = document.querySelector("#nav");
-const standardNav = nav.textContent;
+const pager = document.querySelector("#pager");
+const hotspots = document.querySelector("#hotspots");
+const centers = {
+  "1":[37,72], "2":[81,72], "3":[126,72], "4":[37,109], "5":[81,109], "6":[126,109],
+  "7":[37,146], "8":[81,146], "9":[126,146], guide:[37,183], "0":[81,183], "...":[126,183],
+  vol_up:[37,220],vol_down:[37,277],mute:[81,248],ch_up:[126,219],ch_down:[126,277],
+  voice:[81,297],home:[37,315],ok:[81,380],red:[32,474],green:[64,477],
+  yellow:[97,477],blue:[127,474],netflix:[45,504],prime:[113,504],disney:[45,530],
+  rakuten:[113,530],lg_channels:[45,557],alexa:[113,557]
+};
+let control = null, pending = false;
 const limit = 12;
 let columns = [[], []], page = 0, activeKey = null, serialized = null, request = null;
 
@@ -42,9 +51,42 @@ function select(row, node) {
   detail.textContent = row.detail || row.label;
 }
 
+async function activate(row) {
+  if (pending || row.enabled === false) return;
+  if (!control) { detail.textContent = "Shortcut control unavailable. Restart Magic Mapper."; return; }
+  pending = true;
+  detail.textContent = "Running · " + row.label;
+  try {
+    const response = await fetch("http://127.0.0.1:" + control.port + "/press", {
+      method: "POST", headers: {"Authorization": "Bearer " + control.token, "Content-Type": "application/json"},
+      body: JSON.stringify(row.key), credentials: "omit", redirect: "error"
+    });
+    if (!response.ok) throw new Error("Shortcut unavailable");
+    detail.textContent = row.detail || row.label;
+  } catch (_) {
+    detail.textContent = "Could not run " + row.label + ".";
+    refresh();
+  } finally { pending = false; }
+}
+
+function addHotspot(row, button) {
+  const center = centers[row.key];
+  if (!center || !Array.isArray(center)) return;
+  const hit = document.createElement("button");
+  hit.className = "hotspot";
+  hit.tabIndex = -1;
+  hit.setAttribute("aria-label", button.textContent);
+  hit.style.left = (864 + center[0] * 858 / 720) + "px";
+  hit.style.top = (135 + center[1] * 858 / 720) + "px";
+  hit.style.width = (["netflix","prime","disney","rakuten","lg_channels","alexa"].includes(row.key) ? 69 : 32) + "px";
+  hit.onmouseenter = () => button.focus();
+  hit.onclick = () => { button.focus(); activate(row); };
+  hotspots.appendChild(hit);
+}
+
 function wireFor(row, side, y) {
   const target = layout[row.key];
-  if (!target) return;
+  if (!Array.isArray(target)) return;
   const x = 864 + target[1] * 858 / 720;
   const ty = 135 + target[2] * 858 / 720;
   const start = side ? 1260 : 660;
@@ -63,9 +105,12 @@ function wireFor(row, side, y) {
 
 function render(focusFirst) {
   keys.textContent = "";
+  hotspots.textContent = "";
   lines.textContent = "";
   const pages = Math.max(1, ...columns.map(column => Math.ceil(column.length / limit)));
-  nav.textContent = standardNav + (pages > 1 ? "   ·   OK  Page " + (page + 1) + "/" + pages : "");
+  pager.hidden = pages < 2;
+  pager.textContent = "Page " + (page + 1) + "/" + pages + "  ›";
+  pager.onclick = () => nextPage(pages);
   const count = columns[0].length + columns[1].length;
   detail.textContent = count + (count === 1 ? " configured key" : " configured keys");
   statusBox.textContent = count ? "" : "No custom keys configured.";
@@ -82,7 +127,7 @@ function render(focusFirst) {
       button.dataset.key = row.key;
       const cap = document.createElement("span");
       cap.className = "cap";
-      cap.textContent = layout[row.key] ? layout[row.key][0] : row.key;
+      cap.textContent = Array.isArray(layout[row.key]) ? layout[row.key][0] : row.key;
       const action = document.createElement("span");
       action.className = "action";
       action.textContent = row.label;
@@ -90,16 +135,19 @@ function render(focusFirst) {
       button.title = row.detail;
       button.onfocus = () => select(row, button);
       button.onmouseenter = () => button.focus();
-      button.onclick = () => pages > 1 ? nextPage(pages) : button.focus();
+      button.setAttribute("aria-disabled", String(row.enabled === false));
+      button.onclick = () => { button.focus(); activate(row); };
+      addHotspot(row, button);
       keys.appendChild(button);
     });
   });
   const chosen = Array.from(keys.children).find(el => el.dataset.key === activeKey);
-  if (chosen || focusFirst) (chosen || keys.firstElementChild)?.focus();
+  if (chosen || focusFirst || document.activeElement === document.body) (chosen || keys.firstElementChild)?.focus();
 }
 function nextPage(pages) { page = (page + 1) % pages; activeKey = null; render(true); }
 
-window.receiveBindings = function(rows, device) {
+window.receiveBindings = function(rows, device, channel) {
+  control = channel || null;
   document.querySelector("#device").textContent = device ? device + "  /" : "";
   const value = JSON.stringify(rows);
   if (value === serialized) return;
@@ -122,7 +170,7 @@ function refresh() {
   function finish() { script.remove(); request = null; }
   script.onerror = () => {
     serialized = null;
-    keys.textContent = ""; lines.textContent = ""; detail.textContent = ""; nav.textContent = "";
+    keys.textContent = ""; lines.textContent = ""; hotspots.textContent = ""; detail.textContent = ""; pager.hidden = true; control = null;
     statusBox.textContent = "Key mappings unavailable. Waiting for Magic Mapper…";
     finish();
   };
@@ -137,6 +185,7 @@ refresh();
 
 document.addEventListener("keydown", event => {
   const code = event.keyCode;
+  if (code === 13 && event.repeat) { event.preventDefault(); return; }
   if (![37,38,39,40].includes(code)) return;
   event.preventDefault();
   const current = document.activeElement;
@@ -146,5 +195,10 @@ document.addEventListener("keydown", event => {
   if (code === 38) index--;
   if (code === 40) index++;
   const siblings = keys.querySelectorAll('[data-side="' + side + '"]');
+  if (!pager.hidden && ((code === 40 && index >= siblings.length) || (code === 38 && index < 0))) {
+    const pages = Math.max(...columns.map(column => Math.ceil(column.length / limit)));
+    page = (page + (code === 40 ? 1 : pages - 1)) % pages;
+    activeKey = null; render(true); return;
+  }
   if (siblings.length) siblings[Math.max(0, Math.min(siblings.length - 1, index))].focus();
 });

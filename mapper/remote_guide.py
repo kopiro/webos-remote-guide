@@ -6,6 +6,8 @@ import re
 import tempfile
 from pathlib import Path
 
+from guide_control import APP_ID, active_actions
+
 APP = Path("/media/developer/apps/usr/palm/applications/me.kopiro.remoteguide")
 APPS = {"com.beb.plxnative": "PlxNative", "io.github.danzig666.ytnative": "YTnative"}
 
@@ -55,24 +57,30 @@ def describe_bindings(config, webhooks, labels=None):
         if not identifier(key):
             continue
         if value == "disabled":
-            rows.append({"key": key, "label": "Disabled", "detail": "Pressing this key has no effect."})
+            rows.append({"key": key, "label": "Disabled", "detail": "Pressing this key has no effect.", "enabled": False})
             continue
         actions = value if isinstance(value, list) else [value]
         parts = []
         descriptions = []
+        titles = []
         for action in actions:
             if not isinstance(action, dict):
                 continue
-            label = describe(action, webhooks, key, labels or {})
+            title = action.get("title")
+            if isinstance(title, str) and title.strip():
+                label = title.strip()
+                titles.append(label)
+            else:
+                label = describe(action, webhooks, key, labels or {})
             parts.append(label)
             gesture = "Tap or hold" if action.get("allow_long_press") else "Tap"
             scope = action.get("appId")
             if identifier(scope):
                 gesture += " in other apps" if scope == "!" else " in " + scope
             descriptions.append(gesture + " · " + label)
-        main = [part for part in parts if part != "Show notification"] or parts
+        main = titles or [part for part in parts if part != "Show notification"] or parts
         rows.append({"key": key, "label": " + ".join(dict.fromkeys(main)) or "Unassigned",
-                     "detail": "  /  ".join(descriptions)})
+                     "enabled": bool(active_actions(value, APP_ID)), "detail": "  /  ".join(descriptions)})
     return rows
 
 
@@ -80,13 +88,16 @@ def local_labels(path):
     return json.loads(path.read_text()) if path.exists() else {}
 
 
-def publish(config, app_dir=APP, labels_dir=Path(__file__).parent):
+def publish(config, app_dir=APP, labels_dir=Path(__file__).parent, control=None):
     if not app_dir.is_dir():
         return
     labels = local_labels(labels_dir / "guide-labels.json")
     rows = describe_bindings(config, local_labels(labels_dir / "webhook-labels.json"), labels)
     # A sibling script loads from the app's own origin on webOS. Never export raw actions.
-    output = "window.receiveBindings(" + json.dumps(rows, ensure_ascii=True) + ", " + json.dumps(labels.get("device", "")) + ");\n"
+    arguments = [rows, labels.get("device", "")]
+    if control is not None:
+        arguments.append(control)
+    output = "window.receiveBindings(" + ", ".join(json.dumps(arg) for arg in arguments) + ");\n"
     with tempfile.NamedTemporaryFile(dir=str(app_dir), delete=False, mode="w") as tmp:
         staged = Path(tmp.name)
     try:
