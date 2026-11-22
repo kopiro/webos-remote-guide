@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920">
+<title>Remote Guide</title>
+<link rel="stylesheet" href="style.css">
+<script src="guide.js" defer></script>
+</head>
+<body>
+<main id="sheet">
+<header><h1>Remote guide</h1><p><span id="device"></span>LG Magic Remote MR24</p></header>
+<img id="remote" src="remote.webp" alt="Front of the LG Magic Remote with European shortcut buttons">
+<svg id="wires" viewBox="0 0 1920 1080" aria-hidden="true">
+<defs>
+<!-- Follow the edge of the photographed shell, keeping button coordinates fixed. -->
+<clipPath id="remote-outline" clipPathUnits="objectBoundingBox">
+  <path transform="scale(.004166667 .000930233)" d="M121 2 C54 2 7 35 6 88 L2 980 C2 1042 43 1072 118 1072 C193 1072 235 1044 236 986 L237 90 C237 36 195 2 121 2 Z"/>
+</clipPath>
+<marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 L3 5Z"/></marker>
+<marker id="tip-active" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 L3 5Z"/></marker></defs>
+<g id="lines"></g></svg>
+<div id="keys"></div><div id="status" role="status">Reading key mappings…</div>
+<footer><p id="detail"></p><div id="nav">↑ ↓ &nbsp; Select key <span>·</span> ← → &nbsp; Switch side</div></footer>
+</main>
+</body></html>

@@ -1,0 +1,14 @@
+{
+  "id": "me.kopiro.remoteguide",
+  "version": "1.0.2",
+  "requiredACG": [],
+  "vendor": "Flavio De Stefano",
+  "type": "web",
+  "main": "index.html",
+  "title": "Remote Guide",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "iconColor": "#000000",
+  "bgColor": "#000000",
+  "resolution": "1920x1080"
+}
